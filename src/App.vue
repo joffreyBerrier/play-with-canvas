@@ -5,11 +5,11 @@ const showModal = ref(false);
 const positionMarker = ref({});
 
 const computedStyleModal = computed(() => {
-  if (positionMarker.value.middlePosition) {
+  if (positionMarker.value.modalPosition) {
     return {
       position: "absolute",
-      left: `${positionMarker.value.realPosition.x + 12}px`,
-      top: `${positionMarker.value.realPosition.y + 12}px`,
+      left: `${positionMarker.value.modalPosition.x + 12}px`,
+      top: `${positionMarker.value.modalPosition.y + 12}px`,
     };
   }
 
@@ -17,76 +17,102 @@ const computedStyleModal = computed(() => {
 });
 
 onMounted(() => {
-  const canvas = document.getElementById("canvas");
-  const ctx = canvas.getContext("2d");
+  const svg = document.getElementById("svgContainer");
 
-  //Get Mouse Position
-  const getMousePos = (c, evt) => {
-    var rect = c.getBoundingClientRect();
+  // Get Mouse Position
+  const getMousePos = (e) => {
+    const pt = svg.createSVGPoint(); // Created once for document
+
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+
+    // The cursor point, translated into svg coordinates
+    const cursorpt = pt.matrixTransform(svg.getScreenCTM().inverse());
+
+    // Divide the size of image
+    positionMarker.value = {
+      realPosition: {
+        x: cursorpt.x,
+        y: cursorpt.y,
+      },
+      // Divide the position by 2 to have a center of the pin
+      modalPosition: {
+        x: e.clientX + 12,
+        y: e.clientY + 12,
+      },
+    };
+
     return {
-      x: ((evt.clientX - rect.left) / (rect.right - rect.left)) * c.width,
-      y: ((evt.clientY - rect.top) / (rect.bottom - rect.top)) * c.height,
+      x: cursorpt.x,
+      y: cursorpt.y,
     };
   };
 
-  // Insert image on canvas
-  const imageObj = new Image();
-  imageObj.onload = () => {
-    ctx.drawImage(
-      imageObj,
-      0,
-      0,
-      imageObj.width,
-      imageObj.height,
-      0,
-      0,
-      canvas.width,
-      canvas.height
+  const createCircle = (x, y, size, svgId) => {
+    const svgns = "http://www.w3.org/2000/svg";
+    const circle = document.createElementNS(svgns, "circle");
+
+    circle.setAttributeNS(null, "cx", x);
+    circle.setAttributeNS(null, "cy", y);
+    circle.setAttributeNS(null, "r", size);
+    circle.setAttribute("id", svgId);
+
+    circleIds.value.push(svgId);
+
+    circle.addEventListener("click", (e) => {
+      console.log(
+        "voilà tu cliques tu as l'info et tu peux faire ce que tu veux 😇",
+        e.target
+      );
+      // Ici tu peux faire ce que tu veux
+    });
+
+    svg.appendChild(circle);
+  };
+
+  // Click on svg container
+  const circleIds = ref([]);
+  const handleClickSvg = (e) => {
+    showModal.value = true;
+
+    getMousePos(e);
+
+    createCircle(
+      positionMarker.value.realPosition.x,
+      positionMarker.value.realPosition.y,
+      10,
+      circleIds.value.length + 1
     );
   };
-  imageObj.src = "tshirt.jpg";
 
-  // Create pin image
-  const pinImageObj = new Image();
-  pinImageObj.src = "pin.png";
+  // handleClickOutside
+  const handleClickOutside = (e) => {
+    if (
+      e?.target?.attributes?.id?.value &&
+      circleIds.value.includes(Number(e.target.attributes.id.value))
+    )
+      return;
 
-  // On click on canvas get position and set the pin
-  canvas.addEventListener(
-    "click",
-    (evt) => {
-      showModal.value = true;
+    handleClickSvg(e);
+  };
 
-      const { x, y } = getMousePos(canvas, evt);
-
-      // Divide the size of image
-      const imageWidth = Math.round(pinImageObj.width / 10);
-      const imageHeight = Math.round(pinImageObj.height / 10);
-
-      positionMarker.value = {
-        realPosition: { x, y },
-        // Divide the position by 2 to have a center of the pin
-        middlePosition: {
-          x: x - imageWidth / 2,
-          y: y - imageHeight / 2,
-        },
-      };
-
-      ctx.drawImage(
-        pinImageObj,
-        positionMarker.value.middlePosition.x,
-        positionMarker.value.middlePosition.y,
-        imageWidth,
-        imageHeight
-      );
-    },
-    false
-  );
+  svg.addEventListener("click", handleClickOutside, false);
 });
 </script>
 
 <template>
   <div>
-    <canvas id="canvas" width="360" height="438"></canvas>
+    <svg id="svgContainer" viewBox="0 0 1000 1000">
+      <image
+        xlink:href="http://localhost:3000/assets/tshirt.jpg"
+        x="0"
+        y="0"
+        height="1000"
+        width="1000"
+      />
+    </svg>
+
+    <!-- <canvas id="canvas" width="360" height="438"></canvas> -->
 
     <div v-if="showModal" class="modal" :style="computedStyleModal">
       <p>Coucou Matthias ❤️</p>
